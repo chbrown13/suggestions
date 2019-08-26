@@ -1,23 +1,17 @@
 #!/usr/bin/python2.7
 
-# from github import Github, GithubException.RateLimitExceededException
 import csv
 import datetime
 import github
 import urllib2
 import time
-import smtplib
-import sys
 
 SUGGESTION = "```suggestion\r\n"
 CODE = "```"
-MSG = "We noticed you recently received a GitHub suggestion on "
 
 def _get_code(comment):
     if is_suggestion(comment):
         delim = SUGGESTION
-    elif is_md_code(comment):
-        delim = CODE
     else:
         return None
     start = comment.index(delim) + len(delim)
@@ -39,27 +33,19 @@ def is_applied(pull, comment):
                     return True
     return False
 
-def is_md_code(comment):
-    if CODE in comment and SUGGESTION not in comment:
-        return True
-    return False
-
 def is_suggestion(comment):
     # Check if comment contains code suggestion to user
     if SUGGESTION in comment:
         return True
     return False
-
-def email():
-    # send email
-    print("email")
     
 def check_comments(pull):
     # Parse PR comments to look for GitHub code suggestions by developers
     comments = pull.get_comments()
     for c in comments:
         time.sleep(5)
-        row = [str(pull.base.repo.full_name),str(pull.number),str(c.commit_id),str(pull.user.login),str(pull.user.email),str(c.user.login),str(c.user.email),repr(c.body),str(is_applied(pull,c)),str(pull.base.repo.language)]
+        row = [str(pull.base.repo.full_name), str(pull.number), str(c.commit_id), str(pull.user.login), \
+            str(pull.user.email), str(c.user.login), str(c.user.email), repr(c.body), str(is_applied(pull,c)), str(pull.base.repo.language)]
         if is_suggestion(c.body):
             if is_applied(pull, c):
                 with open('suggAccept.csv', 'a') as f:
@@ -71,26 +57,9 @@ def check_comments(pull):
                     writer = csv.writer(f, delimiter=',')
                     writer.writerow(row)
                 print(row)
-        # elif is_md_code(c.body):
-        #     if is_applied(pull, c):
-        #         with open('code1.csv', 'a') as f:
-        #             writer = csv.writer(f, delimiter=',')
-        #             writer.writerow(row)
-        #         print(row)
-        #     else:
-        #         with open('code2.csv', 'a') as f:
-        #             writer = csv.writer(f, delimiter=',')
-        #             writer.writerow(row)
-        #         print(row)
 
 def _setup():
     header = ["repo","pullID","commitID","dev_user","dev_email","review_user","review_email","comment","applied","language"]
-    # with open('code1.csv', 'w') as f:
-    #     writer = csv.writer(f, delimiter=',')
-    #     writer.writerow(header)
-    # with open('code2.csv', 'w') as f:
-    #     writer = csv.writer(f, delimiter=',')
-    #     writer.writerow(header)
     with open('sugg1.csv', 'w') as f:
         writer = csv.writer(f, delimiter=',')
         writer.writerow(header)
@@ -98,8 +67,9 @@ def _setup():
         writer = csv.writer(f, delimiter=',')
         writer.writerow(header)
 
+
 _setup()
-git = github.Github("<auth_token>")
+git = github.Github("{auth_token}")
 repos = git.search_repositories('q', sort='forks')
 d = datetime.datetime(2018, 10, 1)
 reps = 0
