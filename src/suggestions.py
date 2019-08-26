@@ -1,17 +1,19 @@
 #!/usr/bin/python2.7
 
-import csv
-import datetime
 import github
-import urllib2
-import time
-import smtplib
-import sys
 
 SUGGESTION = "```suggestion\r\n"
 CODE = "```"
-SUGGESTEE = "Hi {user}! We noticed you recently received a comment using the new suggested changes feature on a review for a pull request you submitted to the {repo} repository on GitHub ({link}). Please consider filling out the brief survey below to provide feedback on your experience with this new feature. Your responses will be anonymized and used for research purposes, and completing the survey will give you the chance to win a $100 Amazon gift card! Thanks for your time.\n"
-SUGGESTER = "Hi {user}! We noticed you recently used the new suggested changes feature to review a pull request for the {repo} repository on GitHub ({link}). Please consider filling out the brief survey below to provide feedback on your experience with this new feature. Your responses will be anonymized and used for research purposes, and completing the survey will give you the chance to win a $100 Amazon gift card! Thanks for your time.\n"
+SUGGESTEE = "Hi {user}! We noticed you recently received a comment using the new suggested changes feature \
+    on a review for a pull request you submitted to the {repo} repository on GitHub ({link}). Please consider \
+    filling out the brief survey below to provide feedback on your experience with this new feature. \
+    Your responses will be anonymized and used for research purposes, and completing the survey will give you \
+    the chance to win a $100 Amazon gift card! Thanks for your time.\n"
+SUGGESTER = "Hi {user}! We noticed you recently used the new suggested changes feature \
+    to review a pull request for the {repo} repository on GitHub ({link}). Please consider \
+    filling out the brief survey below to provide feedback on your experience with this new feature. \
+    Your responses will be anonymized and used for research purposes, and completing the survey will give \
+    you the chance to win a $100 Amazon gift card! Thanks for your time.\n"
 
 def is_suggestion(comment):
     # Check if comment contains code suggestion to user
@@ -20,6 +22,7 @@ def is_suggestion(comment):
     return False
 
 def create_email(pull, comment):
+    # Create email text to send to suggester or suggestee for survey in RQ2
     email1 = email2 = ''
     puller = pull.user
     commenter = comment.user
@@ -35,6 +38,7 @@ def create_email(pull, comment):
             f.write(email2)
 
 def check_comments(pull):
+    # Parse PR comments to look for GitHub code suggestions by developers
     comments = pull.get_comments()
     arr = []
     for c in comments:
@@ -42,15 +46,6 @@ def check_comments(pull):
             print c.body.encode('utf-8')
             arr.append(c)
     return arr
-
-def _get_code(comment):
-    if is_suggestion(comment):
-        delim = SUGGESTION
-    else:
-        return None
-    start = comment.index(delim) + len(delim)
-    end = comment.index("```", start)
-    return comment[start:end].replace('\n','').replace('\r','').lstrip(' ')
 
 def main():
     git = github.Github("{auth_token}")
@@ -66,12 +61,13 @@ def main():
                     except UnicodeEncodeError:
                         f.write('ERROR: ' + issue.html_url + '\n')
                         continue
-                # with open('sample.txt', 'a') as f:
-                #     try:
-                #         f.write(issue.html_url + ' ' + comment.html_url + '   ' + _get_code(comment.body) + '\n')
-                #     except UnicodeEncodeError:
-                #         f.write('ERROR: ' + issue.html_url + '\n')
-                #         continue
+                with open('sample.txt', 'a') as f:
+                    # Create examples to randomly sample for RQ1
+                    try:
+                        f.write(issue.html_url + ' ' + comment.html_url + '   ' + '\n')
+                    except UnicodeEncodeError:
+                        f.write('ERROR: ' + issue.html_url + '\n')
+                        continue
 
 
 if __name__ == "__main__":
