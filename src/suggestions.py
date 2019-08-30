@@ -6,8 +6,6 @@ import datetime
 import github
 import urllib2
 import time
-import smtplib
-import sys
 
 SUGGESTION = "```suggestion\r\n"
 CODE = "```"
@@ -87,7 +85,7 @@ def check_issues(issue):
             writer.writerow(row)
 
 
-def check_pulls(pull):
+def check_pulls(pull, sugg):
     # Collect data from pull requests with no code suggestions
     time.sleep(5)
     row = [
@@ -103,12 +101,11 @@ def check_pulls(pull):
         str((pull.merged_at - pull.created_at).total_seconds())
         if pull.merged_at
         else "",
-        pull.additions,
-        pull.deletions,
+        sugg,
         pull.changed_files,
         ";".join([f.filename for f in pull.get_files()]).encode('utf-8'),
     ]
-    if pull.merged == True:
+    if pull.merged is True:
         with open("pullsAccepted.csv", "a") as f:
             writer = csv.writer(f, delimiter=",")
             writer.writerow(row)
@@ -121,6 +118,7 @@ def check_pulls(pull):
 def check_comments(pull):
     # Parse PR comments to search for code suggestions made by developers
     comments = pull.get_comments()
+    sugg = False
     for c in comments:
         time.sleep(5)
         row = [
@@ -135,15 +133,13 @@ def check_comments(pull):
             str((pull.merged_at - pull.created_at).total_seconds())
             if pull.merged_at
             else "",
-            "",
-            "",
-            "",
             c.path.encode('utf-8'),
             repr(c.body),
         ]
         if is_suggestion(c.body):
+            sugg = True
             applied = is_applied(pull, c)
-            if applied != None:
+            if applied is not None:
                 row[9] = str(
                     (applied.commit.committer.date - c.created_at).total_seconds()
                 )
@@ -158,7 +154,7 @@ def check_comments(pull):
                     writer = csv.writer(f, delimiter=",")
                     writer.writerow(row)
                 print(row)
-    check_pulls(pull)
+    check_pulls(pull, sugg)
 
 
 def _setup():
@@ -172,8 +168,7 @@ def _setup():
         "state",
         "resolve_time",
         "accept_time",
-        "adds",
-        "dels",
+        "suggested_change",
         "changed_files",
         "files",
     ]
@@ -194,8 +189,6 @@ def _setup():
         "state",
         "resolve_time",
         "accept_time",
-        "adds",
-        "dels",
         "files",
         "comment",
     ]
@@ -224,7 +217,7 @@ def _setup():
 
 def main():
     _setup()
-    git = github.Github("<auth_token>")
+    git = github.Github("{auth_token}")
     repos = git.search_repositories("q", sort="forks")
     d = datetime.datetime(2018, 10, 1)
     reps = 0
@@ -235,7 +228,7 @@ def main():
         reps += 1
         for issue in repo.get_issues(state="all"):  # pull requests are issues
             if d < issue.updated_at:
-                if issue.pull_request == None:  # Just an issue
+                if issue.pull_request is None:  # Just an issue
                     time.sleep(45)
                     iss += 1
                     check_issues(issue)
