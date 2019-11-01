@@ -1,11 +1,11 @@
 #!/usr/bin/python2.7
 
-# from github import Github, GithubException.RateLimitExceededException
 import csv
 import datetime
 import github
 import urllib2
 import time
+import os
 
 SUGGESTION = "```suggestion\r\n"
 CODE = "```"
@@ -143,8 +143,6 @@ def check_comments(pull):
                 row[9] = str(
                     (applied.commit.committer.date - c.created_at).total_seconds()
                 )
-                row[10] = str(applied.stats.additions)
-                row[11] = str(applied.stats.deletions)
                 with open("accepted.csv", "a") as f:
                     writer = csv.writer(f, delimiter=",")
                     writer.writerow(row)
@@ -217,7 +215,7 @@ def _setup():
 
 def main():
     _setup()
-    git = github.Github("{auth_token}")
+    git = github.Github(os.environ['GITHUBTOKEN'])
     repos = git.search_repositories("q", sort="forks")
     d = datetime.datetime(2018, 10, 1)
     reps = 0
@@ -226,22 +224,22 @@ def main():
     iss = 0
     for repo in repos:
         reps += 1
-        for issue in repo.get_issues(state="all"):  # pull requests are issues
+        issues = repo.get_issues(state="all")
+        for issue in issues:  # Pull requests are issues
             if d < issue.updated_at:
-                if issue.pull_request is None:  # Just an issue
-                    time.sleep(45)
+                if issue.pull_request is None:  # Issues
+                    time.sleep(15)
                     iss += 1
                     check_issues(issue)
-                    continue
-                else:  # Pull request
+                else:  # Pull requests
                     pull = issue.as_pull_request()
-                    time.sleep(45)
+                    time.sleep(15)
                     comments += pull.get_comments().totalCount
                     prs += 1
                     check_comments(pull)
                 print(repo.full_name, issue.number, reps, prs, comments, iss)
             else:
-                time.sleep(60)
+                time.sleep(30)
                 break
 
 
