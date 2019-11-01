@@ -28,7 +28,6 @@ def _wget(link):
         return ""
     return src
 
-
 def is_applied(pull, comment):
     # Check if the suggested code exists in the latest version
     code = _get_code(comment.body)
@@ -245,3 +244,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+   
