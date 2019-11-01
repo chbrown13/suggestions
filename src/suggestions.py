@@ -1,6 +1,7 @@
 #!/usr/bin/python2.7
 
 import github
+import os
 
 SUGGESTION = "```suggestion\r\n"
 CODE = "```"
@@ -48,7 +49,7 @@ def check_comments(pull):
     return arr
 
 def main():
-    git = github.Github("{auth_token}")
+    git = github.Github(os.environ['GITHUBTOKEN'])
     issues = git.search_issues("q={S} in:comments".replace('{S}',SUGGESTION), sort="updated")
     for issue in issues:
         if issue.pull_request is not None:
