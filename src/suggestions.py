@@ -176,7 +176,7 @@ def _setup():
     with open("pullsRejected.csv", "w") as f:
         writer = csv.writer(f, delimiter=",")
         writer.writerow(pull_header)
-    code_header = [
+    sugg_header = [
         "repo",
         "pullID",
         "commitID",
@@ -192,10 +192,10 @@ def _setup():
     ]
     with open("accepted.csv", "w") as f:
         writer = csv.writer(f, delimiter=",")
-        writer.writerow(code_header)
+        writer.writerow(sugg_header)
     with open("rejected.csv", "w") as f:
         writer = csv.writer(f, delimiter=",")
-        writer.writerow(code_header)
+        writer.writerow(sugg_header)
     issue_header = [
         "repo",
         "issueID",
@@ -214,7 +214,7 @@ def _setup():
 
 
 def main():
-    _setup()
+    # _setup()
     git = github.Github(os.environ['GITHUBTOKEN'])
     repos = git.search_repositories("q", sort="forks")
     d = datetime.datetime(2018, 10, 1)
@@ -223,9 +223,17 @@ def main():
     comments = 0
     iss = 0
     for repo in repos:
+        with open('repos.txt') as f:
+            seen = [s.replace('\n','') for s in f.readlines()]
+        if repo.full_name in seen:
+            print('seen', repo)
+            continue
         reps += 1
         issues = repo.get_issues(state="all")
         for issue in issues:  # Pull requests are issues
+            # if repo.full_name == '' and issue.number >= : # For GitHub API limit reached
+            #     print('seen', repo, issue.number)
+            #     continue
             if d < issue.updated_at:
                 if issue.pull_request is None:  # Issues
                     time.sleep(15)
