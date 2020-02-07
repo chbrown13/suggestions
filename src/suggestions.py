@@ -11,8 +11,8 @@ SUGGESTION = "```suggestion\r\n"
 CODE = "```"
 
 
-def _get_code(comment):
-    start = comment.index(SUGGESTION) + len(SUGGESTION)
+def _get_code(comment, delim):
+    start = comment.index(delim) + len(delim)
     try:
         end = comment.index(CODE, start)
     except ValueError:
@@ -28,9 +28,9 @@ def _wget(link):
         return ""
     return src
 
-def is_applied(pull, comment):
+def is_applied(pull, comment, kind):
     # Check if the suggested code exists in the latest version
-    code = _get_code(comment.body)
+    code = _get_code(comment.body, kind)
     if pull.commits > 1:
         for commit in pull.get_commits():
             if (
@@ -55,8 +55,14 @@ def is_applied(pull, comment):
     return None
 
 def is_suggestion(comment):
-    # Check if comment contains code suggestion to user
+    # Check if pull request comment contains code suggestion to user
     if SUGGESTION in comment:
+        return True
+    return False
+
+def is_code_comment(comment):
+    # Check if a pull request comment contains markdown code suggested to user
+    if SUGGESTION not in comment and CODE in comment:
         return True
     return False
 
@@ -69,22 +75,18 @@ def check_issues(issue):
         issue.user.login.encode('utf-8'),
         issue.closed_by.login.encode('utf-8') if issue.closed_by else "",
         issue.state.encode('utf-8'),
+        str(issue.comments),
         str((issue.closed_at - issue.created_at).total_seconds())
         if issue.closed_at
         else "",
         ";".join([i.name for i in issue.labels]).encode('utf-8'),
     ]
-    if issue.state == "closed":
-        with open("issAccepted.csv", "a") as f:
-            writer = csv.writer(f, delimiter=",")
-            writer.writerow(row)
-    else:
-        with open("issRejected.csv", "a") as f:
-            writer = csv.writer(f, delimiter=",")
-            writer.writerow(row)
+    with open("issues.csv", "a") as f:
+        writer = csv.writer(f, delimiter=",")
+        writer.writerow(row)
 
 
-def check_pulls(pull, sugg):
+def check_pulls(pull, sugg, code):
     # Collect data from pull requests with no code suggestions
     time.sleep(5)
     row = [
@@ -92,32 +94,26 @@ def check_pulls(pull, sugg):
         pull.number,
         pull.user.login.encode('utf-8'),
         pull.merged_by.login.encode('utf-8') if pull.merged_by else "",
-        pull.merged,
         pull.state.encode('utf-8'),
+        pull.merged,
+        str(sugg),
+        str(code),
+        str(pull.comments),
         str((pull.closed_at - pull.created_at).total_seconds())
-        if pull.closed_at
-        else "",
+        if pull.closed_at else "",
         str((pull.merged_at - pull.created_at).total_seconds())
-        if pull.merged_at
-        else "",
-        sugg,
-        pull.changed_files,
-        ";".join([f.filename for f in pull.get_files()]).encode('utf-8'),
+        if pull.merged_at else ""
     ]
-    if pull.merged is True:
-        with open("pullsAccepted.csv", "a") as f:
-            writer = csv.writer(f, delimiter=",")
-            writer.writerow(row)
-    else:
-        with open("pullsRejected.csv", "a") as f:
-            writer = csv.writer(f, delimiter=",")
-            writer.writerow(row)
+    with open("pull_requests.csv", "a") as f:
+        writer = csv.writer(f, delimiter=",")
+        writer.writerow(row)
 
 
 def check_comments(pull):
     # Parse PR comments to search for code suggestions made by developers
     comments = pull.get_comments()
-    sugg = False
+    sugg = 0
+    code = 0
     for c in comments:
         time.sleep(5)
         row = [
@@ -127,93 +123,105 @@ def check_comments(pull):
             pull.user.login.encode('utf-8'),
             c.user.login.encode('utf-8'),
             pull.merged_by.login.encode('utf-8') if pull.merged_by else "",
-            pull.merged,
             pull.state.encode('utf-8'),
+            pull.merged,
+            str((pull.closed_at - pull.created_at).total_seconds())
+            if pull.closed_at else "",
             str((pull.merged_at - pull.created_at).total_seconds())
-            if pull.merged_at
-            else "",
-            c.path.encode('utf-8'),
-            repr(c.body),
+            if pull.merged_at else "",
+            str((c.created_at - pull.created_at).total_seconds()),
+            c.path,
+            None,
+            None,
+            repr(c.body)
         ]
         if is_suggestion(c.body):
-            sugg = True
-            applied = is_applied(pull, c)
+            row[12] = "suggestion"
+            sugg += 1
+            applied = is_applied(pull, c, SUGGESTION)
             if applied is not None:
-                row[9] = str(
+                row[13] = str(
                     (applied.commit.committer.date - c.created_at).total_seconds()
                 )
-                with open("accepted.csv", "a") as f:
-                    writer = csv.writer(f, delimiter=",")
-                    writer.writerow(row)
-                print(row)
+            with open("suggested_changes.csv", "a") as f:
+                writer = csv.writer(f, delimiter=",")
+                writer.writerow(row)
+        else:
+            if is_code_comment(c.body):
+                row[12] = "code_comment"
+                code += 1
+                applied = is_applied(pull, c, CODE)
+                if applied is not None:
+                    row[13] = str(
+                        (applied.commit.committer.date - c.created_at).total_seconds()
+                    )
             else:
-                with open("rejected.csv", "a") as f:
-                    writer = csv.writer(f, delimiter=",")
-                    writer.writerow(row)
-                print(row)
-    check_pulls(pull, sugg)
+                row[12] = "comment"
+            with open("comments.csv", "a") as f:
+                writer = csv.writer(f, delimiter=",")
+                writer.writerow(row)
+        print(row)
+    check_pulls(pull, sugg, code)
 
 
 def _setup():
     # Create .csv files for storing data
     pull_header = [
         "repo",
-        "pullID",
-        "dev_user",
-        "review_user",
-        "merged",
+        "number",
+        "developer",
+        "reviewer",
         "state",
+        "merged",
+        "num_suggestions",
+        "num_code_comments",
+        "num_comments",
         "resolve_time",
-        "accept_time",
-        "suggested_change",
-        "changed_files",
-        "files",
+        "accept_time"
     ]
-    with open("pullsAccepted.csv", "w") as f:
-        writer = csv.writer(f, delimiter=",")
-        writer.writerow(pull_header)
-    with open("pullsRejected.csv", "w") as f:
+    with open("pull_requests.csv", "w") as f:
         writer = csv.writer(f, delimiter=",")
         writer.writerow(pull_header)
     sugg_header = [
         "repo",
-        "pullID",
-        "commitID",
-        "dev_user",
-        "sugg_user",
-        "review_user",
-        "merged",
+        "pull_number",
+        "commit",
+        "developer",
+        "suggester",
+        "reviewer",
         "state",
-        "resolve_time",
+        "merged",
+        "pr_resolve_time",
+        "pr_accept_time",
+        "time_to_comment",
+        "file",
+        "type",
         "accept_time",
-        "files",
         "comment",
     ]
-    with open("accepted.csv", "w") as f:
+    with open("suggested_changes.csv", "w") as f:
         writer = csv.writer(f, delimiter=",")
         writer.writerow(sugg_header)
-    with open("rejected.csv", "w") as f:
+    with open("comments.csv", "w") as f:
         writer = csv.writer(f, delimiter=",")
         writer.writerow(sugg_header)
     issue_header = [
         "repo",
-        "issueID",
-        "dev_user",
-        "review_user",
+        "number",
+        "user",
+        "reviewer",
         "state",
         "resolve_time",
-        "labels",
+        "num_comments",
+        "labels"
     ]
-    with open("issAccepted.csv", "w") as f:
-        writer = csv.writer(f, delimiter=",")
-        writer.writerow(issue_header)
-    with open("issRejected.csv", "w") as f:
+    with open("issues.csv", "w") as f:
         writer = csv.writer(f, delimiter=",")
         writer.writerow(issue_header)
 
 
 def main():
-    # _setup()
+    _setup()
     git = github.Github(os.environ['GITHUBTOKEN'])
     repos = git.search_repositories("q", sort="forks")
     d = datetime.datetime(2018, 10, 1)
@@ -222,17 +230,9 @@ def main():
     comments = 0
     iss = 0
     for repo in repos:
-        with open('repos.txt') as f:
-            seen = [s.replace('\n','') for s in f.readlines()]
-        if repo.full_name in seen:
-            print('seen', repo)
-            continue
         reps += 1
         issues = repo.get_issues(state="all")
         for issue in issues:  # Pull requests are issues
-            # if repo.full_name == '' and issue.number >= : # For GitHub API limit reached
-            #     print('seen', repo, issue.number)
-            #     continue
             if d < issue.updated_at:
                 if issue.pull_request is None:  # Issues
                     time.sleep(15)
